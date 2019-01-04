@@ -24,12 +24,16 @@ package ru.byprogminer.SchemeRenderer
 
 import ru.byprogminer.SchemeRenderer.util.Dimension
 import ru.byprogminer.SchemeRenderer.util.Position
+import java.awt.Image
+import java.awt.image.BufferedImage
 import kotlin.math.roundToInt
 
 class Renderer {
 
     var hGap = 3
     var vGap = 1
+
+    var nodeRenderer: NodeRenderer = GOSTNodeRenderer()
 
     var width: Int
         get() = size.x
@@ -43,6 +47,9 @@ class Renderer {
             size.y = value
         }
 
+    val renderedNodes: Set<RenderedNode>
+        get() = _renderedNodes.toSet()
+
     private val columns = mutableListOf<MutableList<Node>>()
 
     private lateinit var columnWidths: List<Int>
@@ -50,7 +57,9 @@ class Renderer {
 
     private val nodes = mutableMapOf<Node, RenderedNode>()
 
-    infix fun render(nodes: Set<Node>): Pair<Dimension, Set<RenderedNode>> {
+    private lateinit var _renderedNodes: Set<RenderedNode>
+
+    fun render(nodes: Set<Node>): Renderer {
         renderNodes(nodes)
 
         val ret = mutableSetOf<RenderedNode>()
@@ -58,11 +67,51 @@ class Renderer {
             ret.add(renderedNode)
         }
 
-        return Pair(size.copy(), ret.toSet())
+        _renderedNodes = ret.toSet()
+        return this
     }
 
-    fun getSize(node: Node) =
-        Dimension(2, maxOf(3, 1 + (node.inputs.size / 2) * 2))
+    fun renderOn(canvas: Image, zoom: Double? = null): Renderer {
+        if (!this::_renderedNodes.isInitialized) {
+            throw RuntimeException("Nothing to render")
+        }
+
+        @Suppress("NAME_SHADOWING")
+        val zoom = zoom ?: minOf(
+            canvas.getWidth(null).toDouble() / width,
+            canvas.getHeight(null).toDouble() / height
+        )
+
+        val graphics = canvas.graphics
+        for (node in _renderedNodes) {
+            graphics.setClip(
+                (node.position.x * zoom).roundToInt(),
+                (node.position.y * zoom).roundToInt(),
+                (node.size.x * zoom).roundToInt(),
+                (node.size.y * zoom).roundToInt()
+            )
+
+            nodeRenderer.renderNode(node, graphics, zoom)
+        }
+
+        return this
+    }
+
+    fun renderWith(zoom: Double): Image {
+        if (!this::_renderedNodes.isInitialized) {
+            throw RuntimeException("Nothing to render")
+        }
+
+        val canvas = BufferedImage(
+            (width * zoom).roundToInt(),
+            (height * zoom).roundToInt(),
+            BufferedImage.TYPE_INT_ARGB
+        )
+
+        renderOn(canvas, zoom)
+
+        return canvas
+    }
 
     private fun renderNodes(nodes: Set<Node>) {
         for (node in nodes) {
@@ -175,7 +224,7 @@ class Renderer {
             var height = 0
 
             for (node in col) {
-                val size = getSize(node)
+                val size = nodeRenderer.getNodeSize(node)
 
                 maxWidth = maxOf(maxWidth, size.x)
                 height += size.y + vGap
@@ -185,9 +234,29 @@ class Renderer {
             maxHeight = maxOf(maxHeight, height)
         }
 
+        var haveVariablesAtStart = false
+        for (node in columns.first()) {
+            if (node.name != null) {
+                haveVariablesAtStart = true
+                break
+            }
+        }
+
+        var haveVariablesAtEnd = false
+        for (node in columns.last()) {
+            for (input in node.inputs) {
+                if (input is Variable) {
+                    haveVariablesAtEnd = true
+                    break
+                }
+            }
+        }
+
         columnWidths = widths.toList()
         size = Dimension(
-            widths.sum() + hGap * (widths.size - 1),
+            widths.sum() + hGap * (widths.size - 1) +
+                    if (haveVariablesAtStart) { nodeRenderer.variableWidth } else { 0 } +
+                    if (haveVariablesAtEnd) { nodeRenderer.variableWidth } else { 0 },
             maxHeight - vGap
         )
     }
@@ -195,12 +264,19 @@ class Renderer {
     private fun fillNodes() {
         var hOffset = width
 
+        for (node in columns.first()) {
+            if (node.name != null) {
+                hOffset -= nodeRenderer.variableWidth
+                break
+            }
+        }
+
         columns.forEachIndexed { depth, col ->
             hOffset -= columnWidths[depth]
 
             var vOffset = 0
             for (node in col) {
-                val size = getSize(node)
+                val size = nodeRenderer.getNodeSize(node)
 
                 nodes[node] = RenderedNode(node, size, Position(hOffset, vOffset))
                 vOffset += size.y + vGap

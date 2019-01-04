@@ -22,11 +22,18 @@ SOFTWARE. */
 
 package ru.byprogminer.SchemeRenderer
 
+import java.awt.Color
+import java.awt.Dimension
+import java.awt.Graphics
+import java.awt.image.BufferedImage
+import javax.swing.JFrame
+import javax.swing.JPanel
+
 fun main() {
     val phi = Node(mutableSetOf(
         Variable("x1"),
         Variable("x2")
-    ))
+    ), true)
 
     val scheme = setOf(
         Node(mutableSetOf(
@@ -48,14 +55,39 @@ fun main() {
                 phi
             )),
             phi
-        ))
+        ), false, "f")
     )
 
     val renderer = Renderer()
-    val (size, nodes) = renderer.render(scheme)
+        .render(scheme)
 
-    val canvas = Array(size.y) { Array<RenderedNode?> (size.x) { null } }
-    for (node in nodes) {
+    val rendered = renderer.renderWith(50.0)
+
+    object: JFrame() {
+        init {
+            defaultCloseOperation = EXIT_ON_CLOSE
+
+            contentPane = object: JPanel() {
+                override fun paintComponent(graphics: Graphics) {
+                    super.paintComponent(graphics)
+
+                    val img = BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB)
+                    renderer.renderOn(img)
+
+                    graphics.drawImage(img, 0, 0, width, height, null)
+                }
+            }
+
+            contentPane.background = Color.decode("#086405")
+            contentPane.preferredSize = Dimension(rendered.getWidth(null), rendered.getHeight(null))
+
+            pack()
+            isVisible = true
+        }
+    }
+
+    val canvas = Array(renderer.height) { Array<RenderedNode?> (renderer.width) { null } }
+    for (node in renderer.renderedNodes) {
         for (y in node.position.y until node.position.y + node.size.y) {
             for (x in node.position.x until node.position.x + node.size.x) {
                 canvas[y][x] = node
