@@ -23,14 +23,17 @@ SOFTWARE. */
 package ru.byprogminer.SchemeRenderer
 
 fun main() {
-    val phi = Node(mutableSetOf())
+    val phi = Node(mutableSetOf(
+        Variable("x1"),
+        Variable("x2")
+    ))
 
     val scheme = setOf(
         Node(mutableSetOf(
             Node(mutableSetOf()),
             Node(mutableSetOf(
                 Node(mutableSetOf(
-                    phi
+                    Variable("A")
                 )),
                 Node(mutableSetOf(
                     phi,

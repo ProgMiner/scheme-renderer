@@ -22,6 +22,6 @@ SOFTWARE. */
 
 package ru.byprogminer.SchemeRenderer
 
-class Node(
-    val inputs: MutableSet<NodeInput> = mutableSetOf()
+class Variable(
+    val name: String
 ): NodeInput

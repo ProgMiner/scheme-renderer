@@ -95,9 +95,14 @@ class Renderer {
         }
 
         for (input in node.inputs) {
-            fillColumns(input, depth + 1)
+            if (input is Node) {
+                fillColumns(input, depth + 1)
+            }
         }
     }
+
+    private fun getNodeInputs(node: Node) =
+        node.inputs.filterIsInstance<Node>()
 
     private fun horizontalAlign() {
         if (columns.isEmpty()) {
@@ -117,13 +122,15 @@ class Renderer {
             for (node in col) {
                 val depth: Int
 
-                if (node.inputs.isEmpty()) {
+                if (getNodeInputs(node).isEmpty()) {
                     columns.last().add(node)
                     depth = columns.lastIndex
                 } else {
-                    val minInputDepth = minDepths[node.inputs.minBy {
-                        minDepths[it]!!
-                    }]!!
+                    val minInputDepth = minDepths[
+                            getNodeInputs(node).minBy {
+                                minDepths[it]!!
+                            }
+                    ]!!
                     depth = minInputDepth - 1
 
                     if (depth == i) {
@@ -278,7 +285,7 @@ class Renderer {
             for (node in col) {
                 val renderedNode = nodes[node]!!
 
-                renderedNode.position.y = maxOf(0, calculateAverageHeight(node.inputs.toSet()) - renderedNode.size.y / 2)
+                renderedNode.position.y = maxOf(0, calculateAverageHeight(getNodeInputs(node).toSet()) - renderedNode.size.y / 2)
             }
 
             resolveCollisions(depth)
@@ -293,18 +300,20 @@ class Renderer {
                 val renderedNode = nodes[node]!!
 
                 val center = renderedNode.position.y + renderedNode.size.y / 2
-                val inputsCenter = calculateAverageHeight(node.inputs.toSet())
+                val inputsCenter = calculateAverageHeight(getNodeInputs(node).toSet())
 
                 var offset = center - inputsCenter
                 if (offset != 0) {
                     for (input in node.inputs) {
-                        val inputRenderedNode = nodes[input]!!
-                        inputRenderedNode.position.y += offset
+                        if (input is Node) {
+                            val inputRenderedNode = nodes[input]!!
+                            inputRenderedNode.position.y += offset
 
-                        if (inputRenderedNode.position.y < 0) {
-                            offset -= inputRenderedNode.position.y
+                            if (inputRenderedNode.position.y < 0) {
+                                offset -= inputRenderedNode.position.y
 
-                            inputRenderedNode.position.y = 0
+                                inputRenderedNode.position.y = 0
+                            }
                         }
                     }
                 }
