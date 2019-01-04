@@ -22,8 +22,93 @@ SOFTWARE. */
 
 package ru.byprogminer.SchemeRenderer
 
-class Node(
+abstract class Node(
     val inputs: MutableSet<NodeInput> = mutableSetOf(),
     val invertedOutput: Boolean = false,
     val name: String? = null
-): NodeInput
+): NodeInput {
+
+    open class BUF(
+        input: NodeInput,
+        invertedOutput: Boolean = false,
+        name: String? = null
+    ): Node(mutableSetOf(input), invertedOutput, name) {
+
+        constructor(input: NodeInput):
+                this(input, false, null)
+
+        constructor(input: NodeInput, invertedOutput: Boolean = false):
+                this(input, invertedOutput, null)
+
+        constructor(input: NodeInput, name: String? = null):
+                this(input, false, name)
+    }
+
+    open class INV(
+        input: NodeInput,
+        name: String? = null
+    ): BUF(input, true, name)
+
+    open class AND(
+        inputs: MutableSet<NodeInput> = mutableSetOf(),
+        invertedOutput: Boolean = false,
+        name: String? = null
+    ): Node(inputs, invertedOutput, name) {
+
+        constructor(inputs: MutableSet<NodeInput>):
+                this(inputs, false, null)
+
+        constructor(inputs: MutableSet<NodeInput>, invertedOutput: Boolean = false):
+                this(inputs, invertedOutput, null)
+
+        constructor(inputs: MutableSet<NodeInput>, name: String? = null):
+                this(inputs, false, name)
+    }
+
+    open class NAND(
+        inputs: MutableSet<NodeInput> = mutableSetOf(),
+        name: String? = null
+    ): AND(inputs, true, name)
+
+    open class OR(
+        inputs: MutableSet<NodeInput> = mutableSetOf(),
+        invertedOutput: Boolean = false,
+        name: String? = null
+    ): Node(inputs, invertedOutput, name) {
+
+        constructor(inputs: MutableSet<NodeInput>):
+                this(inputs, false, null)
+
+        constructor(inputs: MutableSet<NodeInput>, invertedOutput: Boolean = false):
+                this(inputs, invertedOutput, null)
+
+        constructor(inputs: MutableSet<NodeInput>, name: String? = null):
+                this(inputs, false, name)
+    }
+
+    open class NOR(
+        inputs: MutableSet<NodeInput> = mutableSetOf(),
+        name: String? = null
+    ): OR(inputs, true, name)
+
+    open class XOR(
+        inputs: MutableSet<NodeInput> = mutableSetOf(),
+        invertedOutput: Boolean = false,
+        name: String? = null
+    ): Node(inputs, invertedOutput, name) {
+
+        constructor(inputs: MutableSet<NodeInput>):
+                this(inputs, false, null)
+
+        constructor(inputs: MutableSet<NodeInput>, invertedOutput: Boolean = false):
+                this(inputs, invertedOutput, null)
+
+        constructor(inputs: MutableSet<NodeInput>, name: String? = null):
+                this(inputs, false, name)
+    }
+
+    open class XNOR(
+        inputs: MutableSet<NodeInput> = mutableSetOf(),
+        name: String? = null
+    ): XOR(inputs, true, name)
+}

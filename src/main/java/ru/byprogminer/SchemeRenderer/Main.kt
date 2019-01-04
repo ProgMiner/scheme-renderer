@@ -30,28 +30,26 @@ import javax.swing.JFrame
 import javax.swing.JPanel
 
 fun main() {
-    val phi = Node(mutableSetOf(
+    val phi = Node.OR(mutableSetOf(
         Variable("x1"),
         Variable("x2")
-    ), true)
+    ), invertedOutput = true)
 
     val scheme = setOf(
-        Node(mutableSetOf(
-            Node(mutableSetOf()),
-            Node(mutableSetOf(
-                Node(mutableSetOf(
-                    Variable("A")
-                )),
-                Node(mutableSetOf(
+        Node.AND(mutableSetOf(
+            Node.XOR(),
+            Node.XNOR(mutableSetOf(
+                Node.BUF(Variable("A")),
+                Node.NOR(mutableSetOf(
                     phi,
-                    Node(mutableSetOf())
+                    Node.NAND(mutableSetOf())
                 )),
-                Node(mutableSetOf()),
+                Node.AND(mutableSetOf()),
                 phi
             )),
-            Node(mutableSetOf(
-                Node(mutableSetOf()),
-                Node(mutableSetOf()),
+            Node.XOR(mutableSetOf(
+                Node.XOR(mutableSetOf()),
+                Node.AND(mutableSetOf()),
                 phi
             )),
             phi
@@ -84,26 +82,5 @@ fun main() {
             pack()
             isVisible = true
         }
-    }
-
-    val canvas = Array(renderer.height) { Array<RenderedNode?> (renderer.width) { null } }
-    for (node in renderer.renderedNodes) {
-        for (y in node.position.y until node.position.y + node.size.y) {
-            for (x in node.position.x until node.position.x + node.size.x) {
-                canvas[y][x] = node
-            }
-        }
-    }
-
-    for (y in canvas.indices) {
-        for (x in canvas[y].indices) {
-            if (canvas[y][x] != null) {
-                print("XX")
-            } else {
-                print("  ")
-            }
-        }
-
-        println()
     }
 }
