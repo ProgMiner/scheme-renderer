@@ -44,7 +44,6 @@ class Renderer {
         }
 
     private val columns = mutableListOf<MutableList<Node>>()
-    private val outputs = mutableMapOf<Node, MutableSet<Node>>()
 
     private lateinit var columnWidths: List<Int>
     private lateinit var size: Dimension
@@ -76,7 +75,16 @@ class Renderer {
         calculateSize()
         fillNodes()
 
-        verticalAlign()
+        verticalAlignRight()
+        verticalAlignLeft()
+
+        recalculateHeight()
+        for (i in columns.indices) {
+            resolveCollisions(i)
+        }
+
+        recalculateHeight()
+        verticalAlignRight()
     }
 
     private fun fillColumns(node: Node, depth: Int) {
@@ -88,11 +96,6 @@ class Renderer {
 
         for (input in node.inputs) {
             fillColumns(input, depth + 1)
-
-            val inputOutputs = outputs[input]
-            inputOutputs?.add(node)
-
-            outputs[input] = inputOutputs ?: mutableSetOf(node)
         }
     }
 
@@ -200,63 +203,124 @@ class Renderer {
         }
     }
 
-    private fun verticalAlign() {
-        for (depth in columns.lastIndex - 1 downTo 0) {
-            val col = columns[depth]
+    private fun calculateAverageHeight(nodes: Set<Node>): Int {
+        var sum = .0
+
+        for (node in nodes) {
+            val renderedNode = this.nodes[node]!!
+
+            val top = renderedNode.position.y
+            val bottom = top + renderedNode.size.y - 1
+            sum += (top + bottom).toDouble() / 2
+        }
+
+        return (sum / nodes.size).roundToInt()
+    }
+
+    private fun resolveCollisions(depth: Int) {
+        val col = columns[depth]
+
+        repeat@while(true) {
+            val grid = Array<Node?>(height) { null }
+            val collision = Array<Node?>(height) { null }
 
             for (node in col) {
-                val top = nodes[node.inputs.minBy { nodes[it]!!.position.y }]!!.position.y
-                val bottomNode = nodes[node.inputs.maxBy { nodes[it]!!.position.y }]!!
-                val bottom = bottomNode.position.y + bottomNode.size.y - 1
-                val center = (top + bottom) / 2
-
                 val renderedNode = nodes[node]!!
-                renderedNode.position.y = center - renderedNode.size.y / 2
-            }
 
-            repeat@while(true) {
-                val grid = Array<Node?>(height) { null }
-                val collision = Array<Node?>(height) { null }
-
-                for (node in col) {
-                    val renderedNode = nodes[node]!!
-
-                    for (y in renderedNode.position.y until renderedNode.position.y + renderedNode.size.y + vGap) {
+                for (y in renderedNode.position.y until renderedNode.position.y + renderedNode.size.y + vGap) {
+                    try {
                         if (grid[y] != null) {
                             collision[y] = node
                         } else {
                             grid[y] = node
                         }
-                    }
+                    } catch (e: IndexOutOfBoundsException) {}
+                }
+            }
+
+            for (i in collision.indices) {
+                val nodeB = collision[i] ?: continue
+                val nodeA = grid[i]!!
+
+                val renderedNodeA = nodes[nodeA]!!
+                val renderedNodeB = nodes[nodeB]!!
+
+                val top = renderedNodeA.position.y
+                val bottom = renderedNodeB.position.y + renderedNodeB.size.y - 1
+                var center = (top * nodeA.inputs.size + bottom * nodeB.inputs.size).toDouble() / (nodeA.inputs.size + nodeB.inputs.size)
+                val height = renderedNodeA.size.y.toDouble() + vGap + renderedNodeB.size.y
+
+                if (center.isNaN()) {
+                    center = (top + bottom).toDouble() / 2
                 }
 
-                for (i in collision.indices) {
-                    val nodeB = collision[i] ?: continue
-                    val nodeA = grid[i]!!
+                renderedNodeA.position.y = (center - height / 2).roundToInt()
+                renderedNodeB.position.y = (center + height / 2 + 1 - renderedNodeB.size.y).roundToInt()
 
-                    val renderedNodeA = nodes[nodeA]!!
-                    val renderedNodeB = nodes[nodeB]!!
+                if (renderedNodeA.position.y < 0) {
+                    val offset = -renderedNodeA.position.y
 
-                    val top = renderedNodeA.position.y
-                    val bottom = renderedNodeB.position.y + renderedNodeB.size.y - 1
-                    val center = (top * nodeA.inputs.size + bottom * nodeB.inputs.size).toDouble() / (nodeA.inputs.size + nodeB.inputs.size)
-                    val height = renderedNodeA.size.y.toDouble() + vGap + renderedNodeB.size.y
-
-                    renderedNodeA.position.y = (center - height / 2).roundToInt()
-                    renderedNodeB.position.y = (center + height / 2 + 1 - renderedNodeB.size.y).roundToInt()
-
-                    if (renderedNodeA.position.y < 0) {
-                        val offset = -renderedNodeA.position.y
-
-                        renderedNodeA.position.y = 0
-                        renderedNodeB.position.y += offset
-                    }
-
-                    continue@repeat
+                    renderedNodeA.position.y = 0
+                    renderedNodeB.position.y += offset
                 }
 
-                break
+                continue@repeat
+            }
+
+            break
+        }
+    }
+
+    private fun verticalAlignRight() {
+        for (depth in columns.lastIndex - 1 downTo 0) {
+            val col = columns[depth]
+
+            for (node in col) {
+                val renderedNode = nodes[node]!!
+
+                renderedNode.position.y = maxOf(0, calculateAverageHeight(node.inputs.toSet()) - renderedNode.size.y / 2)
+            }
+
+            resolveCollisions(depth)
+        }
+    }
+
+    private fun verticalAlignLeft() {
+        for (depth in 0 until columns.lastIndex) {
+            val col = columns[depth]
+
+            for (node in col) {
+                val renderedNode = nodes[node]!!
+
+                val center = renderedNode.position.y + renderedNode.size.y / 2
+                val inputsCenter = calculateAverageHeight(node.inputs.toSet())
+
+                var offset = center - inputsCenter
+                if (offset != 0) {
+                    for (input in node.inputs) {
+                        val inputRenderedNode = nodes[input]!!
+                        inputRenderedNode.position.y += offset
+
+                        if (inputRenderedNode.position.y < 0) {
+                            offset -= inputRenderedNode.position.y
+
+                            inputRenderedNode.position.y = 0
+                        }
+                    }
+                }
             }
         }
+    }
+
+    private fun recalculateHeight() {
+        var height = 0
+
+        for (col in columns) {
+            val maxNode = nodes[col.maxBy { nodes[it]!!.position.y }]!!
+
+            height = maxOf(height, maxNode.position.y + maxNode.size.y)
+        }
+
+        this.height = height
     }
 }
