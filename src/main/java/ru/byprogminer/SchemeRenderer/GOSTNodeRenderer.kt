@@ -68,11 +68,13 @@ class GOSTNodeRenderer: NodeRenderer {
             (node.size.y * zoom).roundToInt()
         )
 
-        var sign: String? = null
-        for ((nodeType, nodeSign) in SIGNS) {
-            if (nodeType.isInstance(node.node)) {
-                sign = nodeSign
-                break
+        var sign: String? = SIGNS[node.node::class.java]
+        if (sign == null) {
+            for ((nodeType, nodeSign) in SIGNS) {
+                if (nodeType.isInstance(node.node)) {
+                    sign = nodeSign
+                    break
+                }
             }
         }
 

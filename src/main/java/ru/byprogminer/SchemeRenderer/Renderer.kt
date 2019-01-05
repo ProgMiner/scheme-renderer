@@ -24,8 +24,10 @@ package ru.byprogminer.SchemeRenderer
 
 import ru.byprogminer.SchemeRenderer.util.Dimension
 import ru.byprogminer.SchemeRenderer.util.Position
+import ru.byprogminer.SchemeRenderer.util.nearestEntry
 import java.awt.Image
 import java.awt.image.BufferedImage
+import java.util.*
 import kotlin.math.roundToInt
 
 class Renderer {
@@ -111,6 +113,111 @@ class Renderer {
         renderOn(canvas, zoom)
 
         return canvas
+    }
+
+    private fun getVerticalCenterOfNode(node: RenderedNode) =
+        (node.position.y.toDouble() + (node.size.y - 1).toDouble() / 2)
+
+    private fun renderLines() {
+        val outputs = mutableMapOf<Node, MutableSet<Node>>()
+        val depths = mutableMapOf<Node, Int>()
+
+        for (depth in columns.indices) {
+            for (node in columns[depth]) {
+                depths[node] = depth
+            }
+        }
+
+        for (node in _renderedNodes) {
+            for (input in node.node.inputs) {
+                if (input !is Node) {
+                    continue
+                }
+
+                val nodeOutputs = outputs[input] ?: mutableSetOf()
+
+                nodeOutputs.add(node.node)
+                outputs[input] = nodeOutputs
+            }
+        }
+
+        // The list of maps of numbers of empty areas on each gap
+        //
+        // Area  #   Gap
+        //
+        //  0      |     |
+        // --------+-----+
+        //     ####|     |####
+        //  1  # 0#|     |####
+        //     ####|     |####
+        // --------+-----+####
+        //  2      |     |####
+        //
+        val areasCenters = mutableListOf<List<Double>>()
+        val emptyAreas = mutableListOf<TreeMap<Double, Int>>()
+        for (depth in columns.indices) {
+            val grid = Array(height) { false }
+
+            for (node in columns[depth]) {
+                val renderedNode = nodes[node]!!
+
+                for (y in renderedNode.position.y until renderedNode.position.y + renderedNode.size.y) {
+                    grid[y] = true
+                }
+            }
+
+            var currentAreaStart = 0
+            val currentAreasCenters = mutableListOf<Double>()
+            val currentEmptyAreas = TreeMap<Double, Int>()
+            for (y in grid.indices) {
+                if (currentAreasCenters.size % 2 == (if (grid[y]) { 0 } else { 1 })) {
+                    currentAreasCenters.add((currentAreaStart.toDouble() + y - 1) / 2)
+                    currentAreaStart = y
+                }
+
+                if (currentAreasCenters.size % 2 == 0) {
+                    currentEmptyAreas[y.toDouble()] = currentAreasCenters.size
+                }
+            }
+
+            emptyAreas.add(currentEmptyAreas)
+            areasCenters.add(currentAreasCenters)
+        }
+
+        // The list of sets of lines, that is a pair of start area and end areas on each gap
+        val lines = Array<MutableSet<Pair<Int, Set<Set<Int>>>>>(columns.size) { mutableSetOf() }.toList()
+        for ((node, nodeOutputs) in outputs) {
+            if (depths[node] == 0) {
+                // As a precaution
+                continue
+            }
+
+            val ends = mutableSetOf<Set<Int>>()
+            for (output in nodeOutputs) {
+                val endAreas = mutableSetOf<Int>()
+                val finishGap = depths[output]!! + 1
+
+                var currentGap = depths[node]!!
+                var y = getVerticalCenterOfNode(nodes[node]!!)
+                while (true) {
+                    if (currentGap == finishGap) {
+                        endAreas.add(columns[depths[output]!!].indexOf(output) * 2 + 1)
+                        break
+                    }
+
+                    --currentGap
+                    val currentArea = emptyAreas[currentGap].nearestEntry(y)!!
+                    y = areasCenters[currentGap][currentArea]
+                    endAreas.add(currentArea)
+                }
+
+                ends.add(endAreas)
+            }
+
+            lines[depths[node]!!].add(Pair(columns[depths[node]!!].indexOf(node) * 2 + 1, ends))
+        }
+
+        // TODO
     }
 
     private fun renderNodes(nodes: Set<Node>) {
@@ -290,11 +397,7 @@ class Renderer {
         var sum = .0
 
         for (node in nodes) {
-            val renderedNode = this.nodes[node]!!
-
-            val top = renderedNode.position.y
-            val bottom = top + renderedNode.size.y - 1
-            sum += (top + bottom).toDouble() / 2
+            sum += getVerticalCenterOfNode(this.nodes[node]!!)
         }
 
         return (sum / nodes.size).roundToInt()

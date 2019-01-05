@@ -33,7 +33,7 @@ fun main() {
     val phi = Node.OR(mutableSetOf(
         Variable("x1"),
         Variable("x2")
-    ), invertedOutput = true)
+    ), true, "phi")
 
     val scheme = setOf(
         Node.AND(mutableSetOf(
