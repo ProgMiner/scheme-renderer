@@ -41,7 +41,7 @@ class GOSTNodeRenderer: NodeRenderer {
         )
     }
 
-    var font: Font = Font.decode("Courier New")
+    override var font: Font = Font.decode("Courier New")
 
     override val variableWidth = 2
 

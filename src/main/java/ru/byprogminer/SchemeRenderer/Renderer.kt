@@ -23,8 +23,10 @@ SOFTWARE. */
 package ru.byprogminer.SchemeRenderer
 
 import ru.byprogminer.SchemeRenderer.util.Dimension
+import ru.byprogminer.SchemeRenderer.util.LineNode
 import ru.byprogminer.SchemeRenderer.util.Position
 import ru.byprogminer.SchemeRenderer.util.nearestEntry
+import java.awt.Graphics
 import java.awt.Image
 import java.awt.image.BufferedImage
 import java.util.*
@@ -85,6 +87,8 @@ class Renderer {
         )
 
         val graphics = canvas.graphics
+        renderLines(graphics)
+
         for (node in _renderedNodes) {
             graphics.setClip(
                 (node.position.x * zoom).roundToInt(),
@@ -118,7 +122,7 @@ class Renderer {
     private fun getVerticalCenterOfNode(node: RenderedNode) =
         (node.position.y.toDouble() + (node.size.y - 1).toDouble() / 2)
 
-    private fun renderLines() {
+    private fun renderLines(graphics: Graphics) {
         val outputs = mutableMapOf<Node, MutableSet<Node>>()
         val depths = mutableMapOf<Node, Int>()
 
@@ -180,44 +184,110 @@ class Renderer {
                 }
             }
 
+            currentAreasCenters.add((currentAreaStart.toDouble() + grid.lastIndex) / 2)
+
             emptyAreas.add(currentEmptyAreas)
             areasCenters.add(currentAreasCenters)
         }
 
-        // The list of sets of lines, that is a pair of start area and end areas on each gap
-        val lines = Array<MutableSet<Pair<Int, Set<Set<Int>>>>>(columns.size) { mutableSetOf() }.toList()
+        // The list of lines, that is a pair of start gap and line node
+        val lines = mutableListOf<Pair<Int, LineNode<Int>>>()
+        val linesByStart = mutableMapOf<Node, Int>()
         for ((node, nodeOutputs) in outputs) {
             if (depths[node] == 0) {
                 // As a precaution
                 continue
             }
 
-            val ends = mutableSetOf<Set<Int>>()
+            val startDepth = depths[node]!!
+            val lineNodes = mutableListOf<LineNode<Int>>()
+            val lineNode = LineNode(columns[startDepth].indexOf(node) * 2 + 1)
+            val areas = Array(columns.size - 1) { Array(areasCenters[it].size) { mutableSetOf<Int>() } }
             for (output in nodeOutputs) {
-                val endAreas = mutableSetOf<Int>()
                 val finishGap = depths[output]!! + 1
+                val finishArea = columns[depths[output]!!].indexOf(output) * 2 + 1
+                val finishY = areasCenters[finishGap - 1][finishArea]
 
-                var currentGap = depths[node]!!
+                var prevNode = lineNode
+                var currentGap = startDepth
                 var y = getVerticalCenterOfNode(nodes[node]!!)
                 while (true) {
                     if (currentGap == finishGap) {
-                        endAreas.add(columns[depths[output]!!].indexOf(output) * 2 + 1)
+                        prevNode.continues.add(LineNode(finishArea))
                         break
                     }
 
                     --currentGap
-                    val currentArea = emptyAreas[currentGap].nearestEntry(y)!!
+                    val currentArea = emptyAreas[currentGap].nearestEntry((y + finishY) / 2)!!
                     y = areasCenters[currentGap][currentArea]
-                    endAreas.add(currentArea)
-                }
 
-                ends.add(endAreas)
+                    val currentNode = LineNode(currentArea)
+                    if (prevNode == lineNode) {
+                        lineNodes.add(currentNode)
+                    }
+
+                    prevNode.continues.add(currentNode)
+                    prevNode = currentNode
+
+                    areas[currentGap][currentArea].add(lineNodes.lastIndex)
+                }
             }
 
-            lines[depths[node]!!].add(Pair(columns[depths[node]!!].indexOf(node) * 2 + 1, ends))
+            val connectedLines = mutableListOf<Int>()
+            for (gap in 1 until areas.size) {
+                for (area in areas[gap].indices) {
+                    val lineNodesInArea = areas[gap][area]
+
+                    if (lineNodesInArea.size < 2) {
+                        continue
+                    }
+
+                    val iterator = lineNodesInArea.iterator()
+                    val first = iterator.next()
+
+                    val firstLineNode = lineNodes[first].findValue(area)!!
+                    while (iterator.hasNext()) {
+                        val current = iterator.next()
+
+                        if (current in connectedLines) {
+                            continue
+                        }
+
+                        val currentLineNode = lineNodes[current]
+                        lineNode.continues.remove(currentLineNode)
+
+                        firstLineNode.continues.addAll(currentLineNode.findValue(area)!!.continues)
+                        connectedLines.add(current)
+                    }
+                }
+            }
+
+            lines.add(Pair(startDepth, lineNode))
+            linesByStart[node] = lines.lastIndex
         }
 
-        // TODO
+        /*
+        // Counters of horizontal lines in areas
+        val areasCounters = Array<Array<out Int>>(columns.size) { Array(areasCenters[it].size) { 0 } }
+
+        // Line segments on each gap
+        val gapsSegments = Array<List<IntRange>>(columns.size) { listOf() }
+        for ((startGap, start, paths) in lines) {
+            for (ends in paths) {
+                var gap = startGap
+
+                var prevY = areasCenters[gap][start]
+                for (end in ends) {
+                    --gap
+
+                    val y = areasCenters[gap][end]
+
+                    top = minOf(top, y)
+                    bottom = maxOf(bottom, y)
+                }
+            }
+        }
+        */
     }
 
     private fun renderNodes(nodes: Set<Node>) {
@@ -364,7 +434,7 @@ class Renderer {
             widths.sum() + hGap * (widths.size - 1) +
                     if (haveVariablesAtStart) { nodeRenderer.variableWidth } else { 0 } +
                     if (haveVariablesAtEnd) { nodeRenderer.variableWidth } else { 0 },
-            maxHeight - vGap
+            maxHeight + vGap
         )
     }
 
@@ -381,7 +451,7 @@ class Renderer {
         columns.forEachIndexed { depth, col ->
             hOffset -= columnWidths[depth]
 
-            var vOffset = 0
+            var vOffset = vGap
             for (node in col) {
                 val size = nodeRenderer.getNodeSize(node)
 
@@ -509,6 +579,6 @@ class Renderer {
             height = maxOf(height, maxNode.position.y + maxNode.size.y)
         }
 
-        this.height = height
+        this.height = height + vGap
     }
 }

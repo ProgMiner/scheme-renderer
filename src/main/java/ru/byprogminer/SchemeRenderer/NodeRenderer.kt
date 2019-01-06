@@ -23,9 +23,12 @@ SOFTWARE. */
 package ru.byprogminer.SchemeRenderer
 
 import ru.byprogminer.SchemeRenderer.util.Dimension
+import java.awt.Font
 import java.awt.Graphics
 
 interface NodeRenderer {
+
+    var font: Font
 
     val variableWidth: Int
 
