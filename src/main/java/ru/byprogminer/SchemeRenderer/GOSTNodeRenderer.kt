@@ -48,6 +48,23 @@ class GOSTNodeRenderer: NodeRenderer {
     override fun getNodeSize(node: Node) =
         Dimension(2, maxOf(3, 1 + (node.inputs.size / 2) * 2))
 
+    override fun getNodeInputY(node: RenderedNode, number: Int): Int {
+        if (number >= node.node.inputs.size) {
+            throw IndexOutOfBoundsException("Number of input is greater than inputs count")
+        }
+
+        if (node.node.inputs.size == 1) {
+            return node.position.y + 1
+        }
+
+        if (node.node.inputs.size % 2 == 1) {
+            return node.position.y + number
+        }
+
+        return node.position.y + number +
+                if (number < node.node.inputs.size / 2) { 0 } else { 1 }
+    }
+
     override fun renderNode(node: RenderedNode, graphics: Graphics, zoom: Double) {
         val oldColor = graphics.color
         val oldClip = graphics.clip

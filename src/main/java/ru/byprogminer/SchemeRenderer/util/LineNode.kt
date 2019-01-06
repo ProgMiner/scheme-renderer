@@ -1,6 +1,6 @@
 package ru.byprogminer.SchemeRenderer.util
 
-class LineNode<V>(
+data class LineNode<V>(
     val value: V,
     val continues: MutableSet<LineNode<V>> = mutableSetOf()
 ) {

@@ -190,6 +190,14 @@ class Renderer {
             areasCenters.add(currentAreasCenters)
         }
 
+        // First not-busy input numbers of nodes: from first half and second half of node
+        val busyInputs = mutableMapOf<Node, Pair<Int, Int>>()
+        for (depth in 0 until columns.lastIndex) {
+            for (node in columns[depth]) {
+                busyInputs[node] = Pair(0, node.inputs.size / 2)
+            }
+        }
+
         // The list of lines, that is a pair of start gap and line node
         val lines = mutableListOf<Pair<Int, LineNode<Int>>>()
         val linesByStart = mutableMapOf<Node, Int>()
@@ -266,28 +274,63 @@ class Renderer {
             linesByStart[node] = lines.lastIndex
         }
 
-        /*
         // Counters of horizontal lines in areas
-        val areasCounters = Array<Array<out Int>>(columns.size) { Array(areasCenters[it].size) { 0 } }
+        val areasCounters = Array(columns.size) { Array(areasCenters[it].size) { 0 } }
 
         // Line segments on each gap
-        val gapsSegments = Array<List<IntRange>>(columns.size) { listOf() }
-        for ((startGap, start, paths) in lines) {
-            for (ends in paths) {
-                var gap = startGap
+        val gapsSegments = Array<MutableList<IntRange>>(columns.size) { mutableListOf() }
+        for ((startGap, lineNode) in lines) {
+            fun next (gap: Int, lineNode: LineNode<Int>): Double {
+                val self = areasCenters[gap][lineNode.value]
 
-                var prevY = areasCenters[gap][start]
-                for (end in ends) {
-                    --gap
+                var top = self
+                var bottom = self
+                for (cont in lineNode.continues) {
+                    val contY = if (cont.value % 2 == 1) {
+                        val renderedNode = nodes[columns[gap - 1][cont.value / 2]]!!
+                        val center = areasCenters[gap - 1][cont.value]
 
-                    val y = areasCenters[gap][end]
+                        val number: Int
+                        val oldBusyInputs = busyInputs[renderedNode.node]!!
+                        if (self < center) {
+                            busyInputs[renderedNode.node] = oldBusyInputs.copy(first = oldBusyInputs.first + 1)
+                            number = oldBusyInputs.first
+                        } else {
+                            busyInputs[renderedNode.node] = oldBusyInputs.copy(second = oldBusyInputs.second + 1)
+                            number = oldBusyInputs.second
+                        }
 
-                    top = minOf(top, y)
-                    bottom = maxOf(bottom, y)
+                        try {
+                            nodeRenderer.getNodeInputY(renderedNode, number).toDouble()
+                        } catch (e: IndexOutOfBoundsException) {
+                            busyInputs[renderedNode.node] = oldBusyInputs.copy(second = oldBusyInputs.second - 1)
+                            busyInputs[renderedNode.node] = oldBusyInputs.copy(first = oldBusyInputs.first + 1)
+
+                            nodeRenderer.getNodeInputY(renderedNode, oldBusyInputs.first).toDouble()
+                        }
+                    } else {
+                        next(gap - 1, cont)
+                    }
+
+                    top = minOf(top, contY)
+                    bottom = maxOf(bottom, contY)
                 }
+
+                gapsSegments[gap].add(top.roundToInt()..bottom.roundToInt())
+
+                // If node in empty area
+                if (lineNode.value % 2 == 0) {
+                    ++areasCounters[gap][lineNode.value]
+                }
+
+                return self
             }
+
+            next(startGap, lineNode)
         }
-        */
+
+        // Horizontal lines in areas, this is a pair of start and end of line vertical line ids
+        val areasSegments = Array(columns.size) { Array(areasCenters[it].size) { mutableListOf<Pair<Int, Int>>() } }
     }
 
     private fun renderNodes(nodes: Set<Node>) {

@@ -33,5 +33,6 @@ interface NodeRenderer {
     val variableWidth: Int
 
     fun getNodeSize(node: Node): Dimension
+    fun getNodeInputY(node: RenderedNode, number: Int): Int
     fun renderNode(node: RenderedNode, graphics: Graphics, zoom: Double)
 }
