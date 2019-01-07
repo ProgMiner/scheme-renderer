@@ -42,6 +42,7 @@ class GOSTNodeRenderer: NodeRenderer {
     }
 
     override var font: Font = Font.decode("Courier New")
+    override val foregroundColor = FG_COLOR
 
     override val variableWidth = 2
 
@@ -69,7 +70,6 @@ class GOSTNodeRenderer: NodeRenderer {
         val oldColor = graphics.color
         val oldClip = graphics.clip
         val oldFont = graphics.font
-
         val oldRenderingHint = if (graphics is Graphics2D) {
             graphics.getRenderingHint(RenderingHints.KEY_ANTIALIASING)
         } else { null }
@@ -123,7 +123,6 @@ class GOSTNodeRenderer: NodeRenderer {
         graphics.font = oldFont
         graphics.clip = oldClip
         graphics.color = oldColor
-
         if (graphics is Graphics2D) {
             graphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, oldRenderingHint)
         }
