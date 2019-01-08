@@ -566,15 +566,15 @@ class Renderer {
         fillNodes()
 
         verticalAlignRight()
-        verticalAlignLeft()
+        // verticalAlignLeft()
 
         recalculateHeight()
-        for (i in columns.indices) {
-            resolveCollisions(i)
-        }
+        // for (i in columns.indices) {
+        //     resolveCollisions(i)
+        // }
 
-        recalculateHeight()
-        verticalAlignRight()
+        // recalculateHeight()
+        // verticalAlignRight()
     }
 
     private fun fillColumns(node: Node, depth: Int) {
@@ -742,7 +742,8 @@ class Renderer {
 
         repeat@while(true) {
             val grid = Array<Node?>(height) { null }
-            val collision = Array<Node?>(height) { null }
+            var collisionNode: Node? = null
+            var collisionY = 0
 
             search@for (node in column) {
                 val renderedNode = nodes[node]!!
@@ -750,7 +751,8 @@ class Renderer {
                 for (y in renderedNode.position.y until renderedNode.position.y + renderedNode.size.y + vGap) {
                     try {
                         if (grid[y] != null) {
-                            collision[y] = node
+                            collisionNode = node
+                            collisionY = y
                             break@search
                         } else {
                             grid[y] = node
@@ -759,13 +761,15 @@ class Renderer {
                         @Suppress("NAME_SHADOWING")
                         if (y < 0) {
                             for (node in column) {
-                                ++nodes[node]!!.position.y
+                                nodes[node]!!.position.y -= y
                             }
 
-                            ++height
+                            height -= y
                         } else {
+                            val offset = y - height
+
                             for (node in column) {
-                                --nodes[node]!!.position.y
+                                nodes[node]!!.position.y -= offset
                             }
                         }
 
@@ -774,31 +778,19 @@ class Renderer {
                 }
             }
 
-            for (i in collision.indices) {
-                val nodeB = collision[i] ?: continue
-                val nodeA = grid[i]!!
+            if (collisionNode != null) {
+                val nodeA = grid[collisionY]!!
+                val nodeB = collisionNode
 
                 val renderedNodeA = nodes[nodeA]!!
                 val renderedNodeB = nodes[nodeB]!!
 
-                val top = renderedNodeA.position.y
-                val bottom = renderedNodeB.position.y + renderedNodeB.size.y - 1
-                var center = (top * nodeA.inputs.size + bottom * nodeB.inputs.size).toDouble() / (nodeA.inputs.size + nodeB.inputs.size)
-                val height = renderedNodeA.size.y.toDouble() + vGap + renderedNodeB.size.y
+                val a = getVerticalCenterOfNode(renderedNodeA)
+                val b = getVerticalCenterOfNode(renderedNodeB)
+                val center = (a + b) / 2
 
-                if (center.isNaN()) {
-                    center = (top + bottom).toDouble() / 2
-                }
-
-                renderedNodeA.position.y = (center - height / 2).roundToInt()
-                renderedNodeB.position.y = (center + height / 2 + 1 - renderedNodeB.size.y).roundToInt()
-
-                if (renderedNodeA.position.y < 0) {
-                    val offset = -renderedNodeA.position.y
-
-                    renderedNodeA.position.y = 0
-                    renderedNodeB.position.y += offset
-                }
+                renderedNodeA.position.y = (center - vGap.toDouble() / 2 - renderedNodeA.size.y).roundToInt()
+                renderedNodeB.position.y = (center + vGap.toDouble() / 2).roundToInt()
 
                 continue@repeat
             }

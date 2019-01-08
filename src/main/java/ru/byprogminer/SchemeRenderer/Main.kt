@@ -87,7 +87,11 @@ fun main() {
             Variable("x3", true)
         ), Variable("w1"))
 
-        val w2 = Node.OR(setOf(z4, z6, z7), Variable("w2"))
+        val w2 = Node.OR(setOf(
+            z4,
+            z6,
+            z7
+        ), Variable("w2"))
 
         val y1 = Node.OR(setOf(
             Node.AND(setOf(
@@ -178,7 +182,119 @@ fun main() {
             ))
         ))
 
-        setOf(y1, y2)
+        val y3 = Node.OR(setOf(
+            Node.AND(setOf(
+                Node.OR(setOf(
+                    Node.AND(setOf(
+                        Variable("x2", true),
+                        z3
+                    )),
+                    Node.AND(setOf(
+                        Variable("x2"),
+                        z6
+                    ))
+                )),
+                w1
+            )),
+            Node.AND(setOf(
+                z5,
+                Node.OR(setOf(
+                    z8,
+                    Node.AND(setOf(
+                        Variable("x4"),
+                        Variable("x6")
+                    )),
+                    Node.AND(setOf(
+                        Variable("x3"),
+                        z1
+                    ))
+                ))
+            )),
+            Node.AND(setOf(
+                Variable("x2", true),
+                Variable("x3", true),
+                Variable("x4", true),
+                Variable("x5")
+            )),
+            Node.AND(setOf(
+                z4,
+                Node.OR(setOf(
+                    Node.AND(setOf(
+                        Variable("x2"),
+                        Variable("x4", true)
+                    ))
+                ))
+            )),
+            Node.AND(setOf(
+                z7, z8
+            ))
+        ))
+
+        val y4 = Node.OR(setOf(
+            Node.AND(setOf(
+                Variable("x3", true),
+                Variable("x6"),
+                Node.OR(setOf(
+                    Variable("x4", true),
+                    z7,
+                    Node.AND(setOf(
+                        Variable("x1", true),
+                        Variable("x5", true)
+                    ))
+                ))
+            )),
+            Node.AND(setOf(
+                Variable("x3"),
+                Variable("x6", true),
+                Node.OR(setOf(
+                    z7,
+                    notZ1
+                ))
+            )),
+            Node.AND(setOf(
+                z8,
+                Node.OR(setOf(
+                    Node.AND(setOf(
+                        Variable("x4"),
+                        Variable("x5")
+                    )),
+                    Node.AND(setOf(
+                        Variable("x2"),
+                        z1
+                    ))
+                ))
+            )),
+            Node.AND(setOf(
+                z1,
+                z5,
+                z9
+            ))
+        ))
+
+        val y5 = Node.OR(setOf(
+            Node.AND(setOf(
+                z1,
+                Variable("x2"),
+                Node.OR(setOf(
+                    Node.AND(setOf(
+                        Variable("x5", true),
+                        Variable("x6")
+                    )),
+                    z3,
+                    Node.AND(setOf(
+                        Variable("x3"),
+                        Variable("x5", true)
+                    ))
+                ))
+            )),
+            Node.AND(setOf(
+                z1,
+                z3,
+                Variable("x3")
+            ))
+        ))
+
+        setOf(y1, y2, y3, y4, y5)
     }
 
     val renderer = Renderer()
