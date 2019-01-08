@@ -26,8 +26,10 @@ import java.awt.Color
 import java.awt.Dimension
 import java.awt.Graphics
 import java.awt.image.BufferedImage
-import javax.swing.JFrame
-import javax.swing.JPanel
+import java.lang.Exception
+import java.util.concurrent.CompletableFuture
+import javax.imageio.ImageIO
+import javax.swing.*
 
 fun main() {
     val scheme = run {
@@ -180,7 +182,8 @@ fun main() {
                     ))
                 ))
             ))
-        ), Variable("y2"))
+        ), Variable("y2")
+        )
 
         val y3 = Node.OR(setOf(
             Node.AND(setOf(
@@ -322,6 +325,26 @@ fun main() {
 
             contentPane.background = Color.decode("#086405")
             contentPane.preferredSize = Dimension(rendered.getWidth(null), rendered.getHeight(null))
+
+            val saveButton = JButton("Save to file")
+            saveButton.addActionListener {
+                CompletableFuture.runAsync {
+                    val fileChooser = JFileChooser("Choose path")
+
+                    if (fileChooser.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
+                        val file = fileChooser.selectedFile
+
+                        if (
+                            !file.exists() ||
+                            JOptionPane.showConfirmDialog(this, "Do you want to rewrite file ${file.name}?", "", JOptionPane.YES_NO_OPTION) == JOptionPane.YES_OPTION
+                        ) {
+                            ImageIO.write(renderer.renderWith(50.0) as BufferedImage, "PNG", file)
+                        }
+                    }
+                }
+            }
+
+            contentPane.add(saveButton)
 
             pack()
             isVisible = true
