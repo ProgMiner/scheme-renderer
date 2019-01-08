@@ -30,6 +30,7 @@ import java.lang.Exception
 import java.util.concurrent.CompletableFuture
 import javax.imageio.ImageIO
 import javax.swing.*
+import javax.swing.filechooser.FileNameExtensionFilter
 
 fun main() {
     val scheme = run {
@@ -301,8 +302,8 @@ fun main() {
     }
 
     val renderer = Renderer()
-    renderer.linesWidth = 5
-    renderer.hGap = 8
+    renderer.linesWidth = 7
+    renderer.hGap = 10
 
     renderer.render(scheme)
 
@@ -329,7 +330,23 @@ fun main() {
             val saveButton = JButton("Save to file")
             saveButton.addActionListener {
                 CompletableFuture.runAsync {
+                    val zoom: Double
+
+                    while (true) {
+                        val inputZoom: Double?
+
+                        try {
+                            inputZoom = JOptionPane.showInputDialog(this, "Enter zoom for saving:", "", JOptionPane.QUESTION_MESSAGE, null, null, "50")?.toString()?.toDouble()
+                        } catch(ex: NumberFormatException) {
+                            continue
+                        }
+
+                        zoom = inputZoom ?: return@runAsync
+                        break
+                    }
+
                     val fileChooser = JFileChooser("Choose path")
+                    fileChooser.addChoosableFileFilter(FileNameExtensionFilter("PNG image", "png"))
 
                     if (fileChooser.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
                         val file = fileChooser.selectedFile
@@ -338,7 +355,7 @@ fun main() {
                             !file.exists() ||
                             JOptionPane.showConfirmDialog(this, "Do you want to rewrite file ${file.name}?", "", JOptionPane.YES_NO_OPTION) == JOptionPane.YES_OPTION
                         ) {
-                            ImageIO.write(renderer.renderWith(50.0) as BufferedImage, "PNG", file)
+                            ImageIO.write(renderer.renderWith(zoom) as BufferedImage, "PNG", file)
                         }
                     }
                 }

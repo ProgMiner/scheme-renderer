@@ -122,7 +122,7 @@ class Renderer {
     private fun getVerticalCenterOfNode(node: RenderedNode) =
         (node.position.y.toDouble() + (node.size.y - 1).toDouble() / 2)
 
-    private fun drawBranchCircle(x: Int, y: Int, graphics: Graphics, zoom: Double) {
+    private fun drawBranchCircle(x: Int, y: Int, graphics: Graphics) {
         graphics.fillOval(x - 1, y - 1, 3, 3)
     }
 
@@ -591,11 +591,11 @@ class Renderer {
 
                 val intUnitsY = unitsY.roundToInt()
                 if (startSegment != null && startSegment.start != intUnitsY && startSegment.endInclusive != intUnitsY) {
-                    drawBranchCircle(start, y, graphics, zoom)
+                    drawBranchCircle(start, y, graphics)
                 }
 
                 if (endSegment != null && endSegment.start != intUnitsY && endSegment.endInclusive != intUnitsY) {
-                    drawBranchCircle(end, y, graphics, zoom)
+                    drawBranchCircle(end, y, graphics)
                 }
 
                 graphics.drawLine(start, y, end, y)
