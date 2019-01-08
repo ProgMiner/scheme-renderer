@@ -23,16 +23,16 @@ SOFTWARE. */
 package ru.byprogminer.SchemeRenderer
 
 abstract class Node(
-    val inputs: MutableSet<NodeInput> = mutableSetOf(),
+    val inputs: Set<NodeInput> = emptySet(),
     val invertedOutput: Boolean = false,
-    val name: String? = null
+    val name: Variable? = null
 ): NodeInput {
 
     open class BUF(
         input: NodeInput,
         invertedOutput: Boolean = false,
-        name: String? = null
-    ): Node(mutableSetOf(input), invertedOutput, name) {
+        name: Variable? = null
+    ): Node(setOf(input), invertedOutput, name) {
 
         constructor(input: NodeInput):
                 this(input, false, null)
@@ -40,75 +40,75 @@ abstract class Node(
         constructor(input: NodeInput, invertedOutput: Boolean = false):
                 this(input, invertedOutput, null)
 
-        constructor(input: NodeInput, name: String? = null):
+        constructor(input: NodeInput, name: Variable? = null):
                 this(input, false, name)
     }
 
     open class INV(
         input: NodeInput,
-        name: String? = null
+        name: Variable? = null
     ): BUF(input, true, name)
 
     open class AND(
-        inputs: MutableSet<NodeInput> = mutableSetOf(),
+        inputs: Set<NodeInput> = emptySet(),
         invertedOutput: Boolean = false,
-        name: String? = null
+        name: Variable? = null
     ): Node(inputs, invertedOutput, name) {
 
-        constructor(inputs: MutableSet<NodeInput>):
+        constructor(inputs: Set<NodeInput>):
                 this(inputs, false, null)
 
-        constructor(inputs: MutableSet<NodeInput>, invertedOutput: Boolean = false):
+        constructor(inputs: Set<NodeInput>, invertedOutput: Boolean = false):
                 this(inputs, invertedOutput, null)
 
-        constructor(inputs: MutableSet<NodeInput>, name: String? = null):
+        constructor(inputs: Set<NodeInput>, name: Variable? = null):
                 this(inputs, false, name)
     }
 
     open class NAND(
-        inputs: MutableSet<NodeInput> = mutableSetOf(),
-        name: String? = null
+        inputs: Set<NodeInput> = emptySet(),
+        name: Variable? = null
     ): AND(inputs, true, name)
 
     open class OR(
-        inputs: MutableSet<NodeInput> = mutableSetOf(),
+        inputs: Set<NodeInput> = emptySet(),
         invertedOutput: Boolean = false,
-        name: String? = null
+        name: Variable? = null
     ): Node(inputs, invertedOutput, name) {
 
-        constructor(inputs: MutableSet<NodeInput>):
+        constructor(inputs: Set<NodeInput>):
                 this(inputs, false, null)
 
-        constructor(inputs: MutableSet<NodeInput>, invertedOutput: Boolean = false):
+        constructor(inputs: Set<NodeInput>, invertedOutput: Boolean = false):
                 this(inputs, invertedOutput, null)
 
-        constructor(inputs: MutableSet<NodeInput>, name: String? = null):
+        constructor(inputs: Set<NodeInput>, name: Variable? = null):
                 this(inputs, false, name)
     }
 
     open class NOR(
-        inputs: MutableSet<NodeInput> = mutableSetOf(),
-        name: String? = null
+        inputs: Set<NodeInput> = emptySet(),
+        name: Variable? = null
     ): OR(inputs, true, name)
 
     open class XOR(
-        inputs: MutableSet<NodeInput> = mutableSetOf(),
+        inputs: Set<NodeInput> = emptySet(),
         invertedOutput: Boolean = false,
-        name: String? = null
+        name: Variable? = null
     ): Node(inputs, invertedOutput, name) {
 
-        constructor(inputs: MutableSet<NodeInput>):
+        constructor(inputs: Set<NodeInput>):
                 this(inputs, false, null)
 
-        constructor(inputs: MutableSet<NodeInput>, invertedOutput: Boolean = false):
+        constructor(inputs: Set<NodeInput>, invertedOutput: Boolean = false):
                 this(inputs, invertedOutput, null)
 
-        constructor(inputs: MutableSet<NodeInput>, name: String? = null):
+        constructor(inputs: Set<NodeInput>, name: Variable? = null):
                 this(inputs, false, name)
     }
 
     open class XNOR(
-        inputs: MutableSet<NodeInput> = mutableSetOf(),
-        name: String? = null
+        inputs: Set<NodeInput> = emptySet(),
+        name: Variable? = null
     ): XOR(inputs, true, name)
 }

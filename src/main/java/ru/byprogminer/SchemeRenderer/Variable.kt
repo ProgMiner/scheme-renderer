@@ -23,5 +23,6 @@ SOFTWARE. */
 package ru.byprogminer.SchemeRenderer
 
 class Variable(
-    val name: String
+    val name: String,
+    val inverted: Boolean = false
 ): NodeInput

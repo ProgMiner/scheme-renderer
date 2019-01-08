@@ -123,8 +123,8 @@ class Renderer {
     private fun getVerticalCenterOfNode(node: RenderedNode) =
         (node.position.y.toDouble() + (node.size.y - 1).toDouble() / 2)
 
-    private fun drawBranchCircle(x: Double, y: Double, graphics: Graphics, zoom: Double) {
-        graphics.fillOval((x - 1).roundToInt(), (y - 1).roundToInt(), 3, 3)
+    private fun drawBranchCircle(x: Int, y: Int, graphics: Graphics, zoom: Double) {
+        graphics.fillOval(x - 1, y - 1, 3, 3)
     }
 
     private fun renderLines(graphics: Graphics, zoom: Double) {
@@ -523,7 +523,7 @@ class Renderer {
             }
         }
 
-        for ((_, segments) in horizontalSegmentsY) {
+        for ((unitsY, segments) in horizontalSegmentsY) {
             for ((segment, y) in segments) {
                 val (gap, startSegment, endSegment) = segment
 
@@ -534,6 +534,15 @@ class Renderer {
                         }
                 ][startSegment]!!
                 val end = verticalSegmentsX[gap][endSegment]!!
+
+                val intUnitsY = unitsY.roundToInt()
+                if (startSegment != null && startSegment.start != intUnitsY && startSegment.endInclusive != intUnitsY) {
+                    drawBranchCircle(start, y, graphics, zoom)
+                }
+
+                if (endSegment != null && endSegment.start != intUnitsY && endSegment.endInclusive != intUnitsY) {
+                    drawBranchCircle(end, y, graphics, zoom)
+                }
 
                 graphics.drawLine(start, y, end, y)
             }
@@ -729,23 +738,39 @@ class Renderer {
     }
 
     private fun resolveCollisions(depth: Int) {
-        val col = columns[depth]
+        val column = columns[depth]
 
         repeat@while(true) {
             val grid = Array<Node?>(height) { null }
             val collision = Array<Node?>(height) { null }
 
-            for (node in col) {
+            search@for (node in column) {
                 val renderedNode = nodes[node]!!
 
                 for (y in renderedNode.position.y until renderedNode.position.y + renderedNode.size.y + vGap) {
                     try {
                         if (grid[y] != null) {
                             collision[y] = node
+                            break@search
                         } else {
                             grid[y] = node
                         }
-                    } catch (e: IndexOutOfBoundsException) {}
+                    } catch (e: IndexOutOfBoundsException) {
+                        @Suppress("NAME_SHADOWING")
+                        if (y < 0) {
+                            for (node in column) {
+                                ++nodes[node]!!.position.y
+                            }
+
+                            ++height
+                        } else {
+                            for (node in column) {
+                                --nodes[node]!!.position.y
+                            }
+                        }
+
+                        continue@repeat
+                    }
                 }
             }
 
@@ -828,10 +853,24 @@ class Renderer {
     private fun recalculateHeight() {
         var height = 0
 
-        for (col in columns) {
-            val maxNode = nodes[col.maxBy { nodes[it]!!.position.y }]!!
+        var minY = 0
+        for (column in columns) {
+            for (node in column) {
+                val renderedNode = nodes[node]!!
 
-            height = maxOf(height, maxNode.position.y + maxNode.size.y)
+                minY = minOf(minY, renderedNode.position.y)
+                height = maxOf(height, renderedNode.position.y + renderedNode.size.y)
+            }
+        }
+
+        if (minY == 0) {
+            for (column in columns) {
+                for (node in column) {
+                    nodes[node]!!.position.y += vGap
+                }
+            }
+
+            height += vGap
         }
 
         this.height = height + vGap
