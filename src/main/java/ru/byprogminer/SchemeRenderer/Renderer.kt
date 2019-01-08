@@ -37,7 +37,7 @@ class Renderer {
     var linesWidth = 1
 
     var nodeRenderer: NodeRenderer = GOSTNodeRenderer()
-    var font: Font = Font.createFont(Font.TRUETYPE_FONT, this::class.java.getResourceAsStream("/assets/fonts/cmunbi.ttf"))
+    var font: Font = Font.createFont(Font.TRUETYPE_FONT, this::class.java.getResourceAsStream("/assets/fonts/cmunrm.ttf"))
 
     var width: Int
         get() = size.x
