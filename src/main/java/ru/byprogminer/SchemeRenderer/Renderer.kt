@@ -281,22 +281,18 @@ class Renderer {
             }
         }
 
-        val gapsSegments = Array(columns.size) { mutableSetOf<Segment>() }
-        val gapsSegmentsTerminals = Array(columns.size) { mutableMapOf<Segment, Set<Double>>() }
-        val gapsSegmentsPoints = Array(columns.size) { mutableMapOf<Segment, MutableMap<Double, Int>>() }
-        val gapsSegmentsAreasY = Array(columns.size) { TreeMap<Double, MutableList<Segment?>>() }
-        fun addSegmentsAreaY(gap: Int, y: Double, end: Segment?) {
-            val areasY = gapsSegmentsAreasY[gap - 1][y]
+        val verticalSegments = Array(columns.size) { mutableSetOf<Segment>() }
+        val horizontalSegments = mutableMapOf<Double, MutableSet<Triple<Int, Segment?, Segment?>>>()
+        fun addHorizontalSegment(y: Double, segment: Triple<Int, Segment?, Segment?>) {
+            val segments = horizontalSegments[y]
 
-            if (areasY == null) {
-                gapsSegmentsAreasY[gap - 1][y] = mutableListOf(end)
+            if (segments == null) {
+                horizontalSegments[y] = mutableSetOf(segment)
             } else {
-                areasY.add(end)
+                segments.add(segment)
             }
         }
 
-        // Horizontal lines in areas, this is a pair of start and end segments
-        val areasSegments = Array(columns.size - 1) { Array(areas[it].size) { mutableMapOf<Segment, Segment>() } }
         for ((startGap, lineNode) in lines) {
             fun next (gap: Int, lineNode: LineNode<Int>, outerPreferred: Double): Pair<Double, Segment?> {
                 if (lineNode.value % 2 == 1 && lineNode.continues.isEmpty()) {
@@ -321,31 +317,21 @@ class Renderer {
 
                 val (_, areaTop, areaBottom) = areas[gap][lineNode.value]
                 val inAreaPreferred = when {
-                            (outerPreferred < areaTop) -> areaTop
-                            (outerPreferred > areaBottom) -> areaBottom
-                            else -> outerPreferred
-                        }
+                    (outerPreferred < areaTop) -> areaTop
+                    (outerPreferred > areaBottom) -> areaBottom
+                    else -> outerPreferred
+                }
 
                 var top = inAreaPreferred
                 var bottom = inAreaPreferred
 
                 var contY = .0
-                val segmentTerminals = mutableSetOf<Double>()
-                val segmentContinues = mutableSetOf<Segment>()
-                val continues = mutableMapOf<Segment, Pair<Int, Double>>()
+                val continues = mutableSetOf<Pair<Double, Segment?>>()
                 for (cont in lineNode.continues) {
                     val ret = next(gap - 1, cont, inAreaPreferred)
                     contY = ret.first
 
-                    val contSegment = ret.second
-                    if (contSegment == null) {
-                        segmentTerminals.add(contY)
-                    } else {
-                        segmentContinues.add(contSegment)
-                        continues[contSegment] = Pair(cont.value, contY)
-
-                        addSegmentsAreaY(gap, contY, contSegment)
-                    }
+                    continues.add(ret)
 
                     top = minOf(top, contY)
                     bottom = maxOf(bottom, contY)
@@ -359,28 +345,10 @@ class Renderer {
                         intContY..intContY
                     } else { top.roundToInt()..bottom.roundToInt() }
                 )
-                gapsSegments[gap].add(segment)
+                verticalSegments[gap].add(segment)
 
-                gapsSegmentsTerminals[gap][segment] = segmentTerminals
-                for (unitsY in segmentTerminals) {
-                    val y = ((unitsY + 0.5) * zoom).roundToInt()
-
-                    addSegmentsAreaY(gap, unitsY, null)
-
-                    val points = gapsSegmentsPoints[gap][segment]
-                    if (points == null) {
-                        gapsSegmentsPoints[gap][segment] = mutableMapOf(unitsY to y)
-                    } else {
-                        points[unitsY] = y
-                    }
-                }
-
-                if (segmentContinues.isNotEmpty()) {
-                    for (cont in segmentContinues) {
-                        val (area, y) = continues[cont]!!
-
-                        areasSegments[gap - 1][area][segment] = cont
-                    }
+                for ((y, cont) in continues) {
+                    addHorizontalSegment(y, Triple(gap - 1, segment, cont))
                 }
 
                 return Pair(
@@ -392,17 +360,17 @@ class Renderer {
             }
 
             val (y, segment) = next(startGap, lineNode, areas[startGap][lineNode.value].first)
-            addSegmentsAreaY(startGap + 1, y, segment)
+            addHorizontalSegment(y, Triple(startGap, null, segment))
         }
 
         // TODO Fix inputs coordinates
 
-        val gapsLinesGrids = Array(columns.size) { mutableListOf<Array<Boolean>>() }
-        val gapsLinesSegments = Array(columns.size) { mutableMapOf<Segment, Int>() }
-        for (gap in gapsSegments.indices) {
-            processSegments@for (segment in gapsSegments[gap]) {
-                search@for (line in gapsLinesGrids[gap].indices) {
-                    val grid = gapsLinesGrids[gap][line]
+        val verticalLinesGrids = Array(columns.size) { mutableListOf<Array<Boolean>>() }
+        val verticalLinesSegments = Array(columns.size) { mutableMapOf<Segment, Int>() }
+        for (gap in verticalSegments.indices) {
+            processSegments@for (segment in verticalSegments[gap]) {
+                search@for (line in verticalLinesGrids[gap].indices) {
+                    val grid = verticalLinesGrids[gap][line]
 
                     for (y in segment) {
                         if (grid[y]) {
@@ -414,31 +382,65 @@ class Renderer {
                         grid[y] = true
                     }
 
-                    gapsLinesSegments[gap][segment] = line
+                    verticalLinesSegments[gap][segment] = line
                     continue@processSegments
                 }
 
-                gapsLinesGrids[gap].add(Array(height) { it in segment })
-                gapsLinesSegments[gap][segment] = gapsLinesGrids[gap].lastIndex
+                verticalLinesGrids[gap].add(Array(height) { it in segment })
+                verticalLinesSegments[gap][segment] = verticalLinesGrids[gap].lastIndex
             }
         }
 
-        val gapsSegmentsEnds = Array(columns.size) { mutableMapOf<Segment?, MutableMap<Double, Int>>() }
-        for (gap in gapsSegmentsAreasY.indices) {
-            for ((unitsY, segments) in gapsSegmentsAreasY[gap]) {
-                val space = zoom / (segments.size + 1)
-                var y = unitsY * zoom + space
+        val horizontalLinesGrids = mutableMapOf<Double, MutableList<Array<Segment?>>>()
+        val horizontalLinesSegments = mutableMapOf<Double, MutableMap<Triple<Int, Segment?, Segment?>, Int>>()
+        fun addHorizontalSegmentToLines(y: Double, segment: Triple<Int, Segment?, Segment?>, line: Int) {
+            val segments = horizontalLinesSegments[y]
 
-                for (segment in segments) {
-                    val ends = gapsSegmentsEnds[gap][segment]
+            if (segments == null) {
+                horizontalLinesSegments[y] = mutableMapOf(segment to line)
+            } else {
+                segments[segment] = line
+            }
+        }
 
-                    if (ends == null) {
-                        gapsSegmentsEnds[gap][segment] = mutableMapOf(unitsY to y.roundToInt())
-                    } else {
-                        ends[unitsY] = y.roundToInt()
+        for ((y, segments) in horizontalSegments) {
+            processSegments@for ((column, startSegment, endSegment) in segments) {
+                val gaps = when (null) {
+                    startSegment -> mapOf(column to endSegment)
+                    endSegment   -> mapOf(column + 1 to startSegment)
+                    else -> mapOf(
+                        column + 1 to startSegment,
+                        column to endSegment
+                    )
+                }
+
+                val grids = horizontalLinesGrids[y]
+                if (grids != null) {
+                    search@ for (line in grids.indices) {
+                        val grid = grids[line]
+
+                        for ((gap, segment) in gaps) {
+                            if (grid[gap] != null && grid[gap] != segment) {
+                                continue@search
+                            }
+                        }
+
+                        for ((gap, segment) in gaps) {
+                            grid[gap] = segment
+                        }
+
+                        addHorizontalSegmentToLines(y, Triple(column, startSegment, endSegment), line)
+                        continue@processSegments
                     }
+                }
 
-                    y += space
+                val grid = Array(columns.size) { gaps[it] }
+                if (grids == null) {
+                    horizontalLinesGrids[y] = mutableListOf(grid)
+                    addHorizontalSegmentToLines(y, Triple(column, startSegment, endSegment), 0)
+                } else {
+                    grids.add(grid)
+                    addHorizontalSegmentToLines(y, Triple(column, startSegment, endSegment), grids.lastIndex)
                 }
             }
         }
@@ -452,13 +454,55 @@ class Renderer {
         }
 
         val gapsX = Array(columns.size) { -linesWidth.toDouble() / 2 }
+        val verticalSegmentsX = Array(columns.size) { mutableMapOf<Segment?, Int>() }
         for (gap in gapsX.indices) {
             gapsX[gap] += hOffset - hGap.toDouble() / 2
             gapsX[gap] *= zoom
 
             hOffset -= hGap
             hOffset -= columnWidths[gap]
+
+            verticalSegmentsX[gap][null] = ((hOffset + columnWidths[gap].toDouble() / 2) * zoom).roundToInt()
         }
+
+        val verticalLinesSpaces = Array(columns.size) { linesWidth * zoom / (verticalLinesGrids[it].size + 1) }
+        for (gap in verticalLinesSegments.indices) {
+            for ((segment, order) in verticalLinesSegments[gap]) {
+                verticalSegmentsX[gap][segment] = (gapsX[gap] + (order + 1) * verticalLinesSpaces[gap]).roundToInt()
+            }
+        }
+
+        val verticalSegmentsY = Array(columns.size) { mutableMapOf<Segment, MutableSet<Int>>() }
+        val horizontalSegmentsY = mutableMapOf<Double, Map<Triple<Int, Segment?, Segment?>, Int>>()
+        for ((y, segments) in horizontalLinesSegments) {
+            val space = zoom / (horizontalLinesGrids[y]!!.size + 1)
+            val startY = y * zoom
+
+            val segmentsY = mutableMapOf<Triple<Int, Segment?, Segment?>, Int>()
+            for ((segment, order) in segments) {
+                val currentY = (startY + (order + 1) * space).roundToInt()
+                segmentsY[segment] = currentY
+
+                for ((gap, verticalSegment) in mapOf(
+                    segment.first + 1 to segment.second,
+                    segment.first to segment.third
+                )) {
+                    if (verticalSegment != null) {
+                        val verticalSegmentY = verticalSegmentsY[gap][verticalSegment]
+
+                        if (verticalSegmentY == null) {
+                            verticalSegmentsY[gap][verticalSegment] = mutableSetOf(currentY)
+                        } else {
+                            verticalSegmentY.add(currentY)
+                        }
+                    }
+                }
+            }
+
+            horizontalSegmentsY[y] = segmentsY
+        }
+
+        // TODO Align by terminal segments
 
         val oldGraphicsColor = graphics.color
         val oldRenderingHint = if (graphics is Graphics2D) {
@@ -470,80 +514,28 @@ class Renderer {
             graphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
         }
 
-        val gapsLinesSpaces = Array(columns.size) { linesWidth * zoom / (gapsLinesGrids[it].size + 1) }
-        for (gap in areasSegments.indices) {
-            for (area in areasSegments[gap].indices) {
-                for ((leftSegment, rightSegment) in areasSegments[gap][area]) {
-                    val ends = gapsSegmentsEnds[gap][rightSegment]!!
-                    val unitsY = ends.keys.first()
-                    val y = ends[unitsY]!!
+        for (gap in verticalSegments.indices) {
+            for (segment in verticalSegments[gap]) {
+                val x = verticalSegmentsX[gap][segment]!!
+                val y = verticalSegmentsY[gap][segment]!!
 
-                    @Suppress("NAME_SHADOWING")
-                    for ((gap, segment) in mapOf(
-                        gap + 1 to leftSegment,
-                        gap to rightSegment
-                    )) {
-                        val points = gapsSegmentsPoints[gap][segment]
-
-                        if (points == null) {
-                            gapsSegmentsPoints[gap][segment] = mutableMapOf(unitsY to y)
-                        } else {
-                            points[unitsY] = y
-                        }
-                    }
-
-                    val left = gapsX[gap + 1] + (gapsLinesSegments[gap + 1][leftSegment]!! + 1) * gapsLinesSpaces[gap + 1]
-                    val right = gapsX[gap] + (gapsLinesSegments[gap][rightSegment]!! + 1) * gapsLinesSpaces[gap]
-
-                    graphics.drawLine(left.roundToInt(), y, right.roundToInt(), y)
-
-                    val intUnitsY = unitsY.roundToInt()
-                    if (leftSegment.start != intUnitsY && leftSegment.endInclusive != intUnitsY) {
-                        drawBranchCircle(left, y.toDouble(), graphics, zoom)
-                    }
-
-                    if (rightSegment.start != intUnitsY && rightSegment.endInclusive != intUnitsY) {
-                        drawBranchCircle(right, y.toDouble(), graphics, zoom)
-                    }
-                }
+                graphics.drawLine(x, y.min()!!, x, y.max()!!)
             }
         }
 
-        for (gap in 1..gapsSegmentsPoints.lastIndex) {
-            val nextColX = (gapsX[gap - 1] - hGap * zoom).roundToInt()
-            val colX = (gapsX[gap] - hGap * zoom).roundToInt()
+        for ((_, segments) in horizontalSegmentsY) {
+            for ((segment, y) in segments) {
+                val (gap, startSegment, endSegment) = segment
 
-            for ((segment, points) in gapsSegmentsPoints[gap]) {
-                val x = (gapsX[gap] + (gapsLinesSegments[gap][segment]!! + 1) * gapsLinesSpaces[gap]).roundToInt()
-
-                for (_unitsY in setOf(segment.start, segment.endInclusive)) {
-                    val unitsY = _unitsY.toDouble()
-
-                    if (unitsY !in emptyAreas[gap] && (unitsY !in points || segment.start == segment.endInclusive)) {
-                        val y = gapsSegmentsEnds[gap][segment]!![unitsY]!!
-
-                        points[unitsY] = y
-                        graphics.drawLine(colX, y, x, y)
-                    }
-                }
-
-                val terminals = gapsSegmentsTerminals[gap][segment]
-                if (terminals != null) {
-                    for (unitsY in terminals) {
-                        val y = gapsSegmentsEnds[gap - 1][null]!![unitsY]!!
-
-                        graphics.drawLine(nextColX, y, x, y)
-
-                        val intUnitsY = unitsY.roundToInt()
-                        if (segment.start != intUnitsY && segment.endInclusive != intUnitsY) {
-                            drawBranchCircle(x.toDouble(), y.toDouble(), graphics, zoom)
+                val start = verticalSegmentsX[gap +
+                        when (startSegment) {
+                            null -> 0
+                            else -> 1
                         }
-                    }
-                }
+                ][startSegment]!!
+                val end = verticalSegmentsX[gap][endSegment]!!
 
-                val top = points.values.min()!!
-                val bottom = points.values.max()!!
-                graphics.drawLine(x, top, x, bottom)
+                graphics.drawLine(start, y, end, y)
             }
         }
 
