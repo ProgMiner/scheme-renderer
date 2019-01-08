@@ -180,7 +180,7 @@ fun main() {
                     ))
                 ))
             ))
-        ))
+        ), Variable("y2"))
 
         val y3 = Node.OR(setOf(
             Node.AND(setOf(
@@ -228,7 +228,7 @@ fun main() {
             Node.AND(setOf(
                 z7, z8
             ))
-        ))
+        ), Variable("y3"))
 
         val y4 = Node.OR(setOf(
             Node.AND(setOf(
@@ -269,7 +269,7 @@ fun main() {
                 z5,
                 z9
             ))
-        ))
+        ), Variable("y4"))
 
         val y5 = Node.OR(setOf(
             Node.AND(setOf(
@@ -292,13 +292,16 @@ fun main() {
                 z3,
                 Variable("x3")
             ))
-        ))
+        ), Variable("y5"))
 
         setOf(y1, y2, y3, y4, y5)
     }
 
     val renderer = Renderer()
-        .render(scheme)
+    renderer.linesWidth = 5
+    renderer.hGap = 8
+
+    renderer.render(scheme)
 
     val rendered = renderer.renderWith(50.0)
 

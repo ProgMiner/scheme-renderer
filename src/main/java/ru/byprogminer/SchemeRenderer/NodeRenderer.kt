@@ -29,7 +29,6 @@ import java.awt.Graphics
 
 interface NodeRenderer {
 
-    var font: Font
     val foregroundColor: Color
 
     val variableWidth: Int

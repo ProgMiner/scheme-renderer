@@ -23,10 +23,8 @@ SOFTWARE. */
 package ru.byprogminer.SchemeRenderer
 
 import ru.byprogminer.SchemeRenderer.util.*
-import java.awt.Graphics
-import java.awt.Graphics2D
-import java.awt.Image
-import java.awt.RenderingHints
+import ru.byprogminer.SchemeRenderer.util.Dimension
+import java.awt.*
 import java.awt.image.BufferedImage
 import java.util.*
 import kotlin.math.roundToInt
@@ -39,6 +37,7 @@ class Renderer {
     var linesWidth = 1
 
     var nodeRenderer: NodeRenderer = GOSTNodeRenderer()
+    var font: Font = Font.createFont(Font.TRUETYPE_FONT, this::class.java.getResourceAsStream("/assets/fonts/cmunbi.ttf"))
 
     var width: Int
         get() = size.x
@@ -127,8 +126,30 @@ class Renderer {
         graphics.fillOval(x - 1, y - 1, 3, 3)
     }
 
+    @Suppress("NAME_SHADOWING")
+    private fun drawVariable(variable: Variable, x: Double, y: Double, graphics: Graphics, zoom: Double) {
+        val oldFont = graphics.font
+
+        graphics.font = font.deriveFont((zoom * 3 / 4).toFloat())
+        val metrics = graphics.fontMetrics
+
+        val coef = zoom / metrics.height
+        val width = metrics.stringWidth(variable.name) * coef
+
+        val x = (x - width / 2).roundToInt()
+        val y = (y + zoom / 4).roundToInt()
+
+        graphics.drawString(variable.name, x, y)
+
+        if (variable.inverted) {
+            val lineY = (y - zoom * 2 / 3).roundToInt()
+            graphics.drawLine(x, lineY, (x + width).roundToInt(), lineY)
+        }
+
+        graphics.font = oldFont
+    }
+
     private fun renderLines(graphics: Graphics, zoom: Double) {
-        val outputs = mutableMapOf<Node, MutableSet<Node>>()
         val depths = mutableMapOf<Node, Int>()
 
         for (depth in columns.indices) {
@@ -137,6 +158,7 @@ class Renderer {
             }
         }
 
+        val outputs = mutableMapOf<Node, MutableSet<Node>>()
         for (node in _renderedNodes) {
             for (input in node.node.inputs) {
                 if (input !is Node) {
@@ -152,15 +174,15 @@ class Renderer {
 
         // The list of maps of numbers of empty areas on each gap
         //
-        // Area  #   Gap
-        //
-        //  0      |     |
-        // --------+-----+
-        //     ####|     |####
-        //  1  # 0#|     |####
-        //     ####|     |####
-        // --------+-----+####
-        //  2      |     |####
+        // Area           Area
+        //      Col  Gap       Col
+        //  0      |     | 0
+        // --------+-----+--------
+        //     ####|     |    ####
+        //  1  # 0#|     |    #  #
+        //     ####|     | 1  # 0#
+        // --------+-----+    #  #
+        //  2      |     |    ####
         //
         val emptyAreas = mutableListOf<TreeMap<Double, Int>>()
 
@@ -198,8 +220,7 @@ class Renderer {
         }
 
         // The list of lines, that is a pair of start gap and line node
-        val lines = mutableListOf<Pair<Int, LineNode<Int>>>()
-        val linesByStart = mutableMapOf<Node, Int>()
+        val lines = mutableSetOf<Pair<Int, LineNode<Int>>>()
         for ((node, nodeOutputs) in outputs) {
             if (depths[node] == 0) {
                 // As a precaution
@@ -208,14 +229,14 @@ class Renderer {
 
             val startDepth = depths[node]!!
             val lineNodes = mutableListOf<LineNode<Int>>()
-            val lineNode = LineNode(columns[startDepth].indexOf(node) * 2 + 1)
+            val rootNode = LineNode(columns[startDepth].indexOf(node) * 2 + 1)
             val areasNodes = Array(columns.size - 1) { Array(areas[it].size) { mutableSetOf<Int>() } }
             for (output in nodeOutputs) {
                 val finishGap = depths[output]!! + 1
                 val finishArea = columns[depths[output]!!].indexOf(output) * 2 + 1
                 val finishY = areas[finishGap - 1][finishArea].first
 
-                var prevNode = lineNode
+                var prevNode = rootNode
                 var currentGap = startDepth
                 var y = getVerticalCenterOfNode(nodes[node]!!)
                 while (true) {
@@ -229,7 +250,7 @@ class Renderer {
                     y = areas[currentGap][currentArea].first
 
                     val currentNode = LineNode(currentArea)
-                    if (prevNode == lineNode) {
+                    if (prevNode == rootNode) {
                         lineNodes.add(currentNode)
                     }
 
@@ -261,7 +282,7 @@ class Renderer {
                         }
 
                         val currentLineNode = lineNodes[current]
-                        lineNode.continues.remove(currentLineNode)
+                        rootNode.continues.remove(currentLineNode)
 
                         firstLineNode.continues.addAll(currentLineNode.findValue(areaNodes)!!.continues)
                         connectedLines.add(current)
@@ -269,16 +290,35 @@ class Renderer {
                 }
             }
 
-            lines.add(Pair(startDepth, lineNode))
-            linesByStart[node] = lines.lastIndex
+            lines.add(Pair(startDepth, rootNode))
         }
 
         // First not-busy input numbers of nodes: from first half and second half of node
         val busyInputs = mutableMapOf<Node, Pair<Int, Int>>()
-        for (depth in 0 until columns.lastIndex) {
-            for (node in columns[depth]) {
+        for (column in columns.indices) {
+            for (node in columns[column]) {
                 busyInputs[node] = Pair(0, node.inputs.size / 2)
             }
+        }
+
+        fun nextInput(gap: Int, area: Int, preferred: Double = .0): Double {
+            val renderedNode = nodes[columns[gap][area / 2]]!!
+            val areaCenter = areas[gap][area].first
+
+            val number: Int
+            val (firstHalf, secondHalf) = busyInputs[renderedNode.node]!!
+            if (
+                (preferred < areaCenter && firstHalf < renderedNode.node.inputs.size / 2) ||
+                (preferred >= areaCenter && secondHalf >= renderedNode.node.inputs.size)
+            ) {
+                busyInputs[renderedNode.node] = Pair(firstHalf + 1, secondHalf)
+                number = firstHalf
+            } else {
+                busyInputs[renderedNode.node] = Pair(firstHalf, secondHalf + 1)
+                number = secondHalf
+            }
+
+            return nodeRenderer.getNodeInputY(renderedNode, number).toDouble()
         }
 
         val verticalSegments = Array(columns.size) { mutableSetOf<Segment>() }
@@ -296,23 +336,7 @@ class Renderer {
         for ((startGap, lineNode) in lines) {
             fun next (gap: Int, lineNode: LineNode<Int>, outerPreferred: Double): Pair<Double, Segment?> {
                 if (lineNode.value % 2 == 1 && lineNode.continues.isEmpty()) {
-                    val renderedNode = nodes[columns[gap][lineNode.value / 2]]!!
-                    val areaCenter = areas[gap][lineNode.value].first
-
-                    val number: Int
-                    val (firstHalf, secondHalf) = busyInputs[renderedNode.node]!!
-                    if (
-                        (outerPreferred < areaCenter && firstHalf < renderedNode.node.inputs.size / 2) ||
-                        (outerPreferred >= areaCenter && secondHalf >= renderedNode.node.inputs.size)
-                    ) {
-                        busyInputs[renderedNode.node] = Pair(firstHalf + 1, secondHalf)
-                        number = firstHalf
-                    } else {
-                        busyInputs[renderedNode.node] = Pair(firstHalf, secondHalf + 1)
-                        number = secondHalf
-                    }
-
-                    return Pair(nodeRenderer.getNodeInputY(renderedNode, number).toDouble(), null)
+                    return Pair(nextInput(gap, lineNode.value, outerPreferred), null)
                 }
 
                 val (_, areaTop, areaBottom) = areas[gap][lineNode.value]
@@ -459,8 +483,7 @@ class Renderer {
             gapsX[gap] += hOffset - hGap.toDouble() / 2
             gapsX[gap] *= zoom
 
-            hOffset -= hGap
-            hOffset -= columnWidths[gap]
+            hOffset -= hGap + columnWidths[gap]
 
             verticalSegmentsX[gap][null] = ((hOffset + columnWidths[gap].toDouble() / 2) * zoom).roundToInt()
         }
@@ -520,6 +543,37 @@ class Renderer {
                 val y = verticalSegmentsY[gap][segment]!!
 
                 graphics.drawLine(x, y.min()!!, x, y.max()!!)
+            }
+        }
+
+        for (column in columns.indices) {
+            val x = verticalSegmentsX[column][null]!!
+
+            val variablesWidth = ((hGap - linesWidth + columnWidths[column] - 1) * zoom / 2).roundToInt()
+            for (i in columns[column].indices) {
+                val node = columns[column][i]
+                val area = i * 2 + 1
+
+                for (input in node.inputs) {
+                    if (input is Variable) {
+                        val unitsY = nextInput(column, area) + 0.5
+                        val y = (unitsY * zoom).roundToInt()
+
+                        graphics.drawLine(x - variablesWidth, y, x, y)
+                        drawVariable(input, x - variablesWidth - zoom / 2, y.toDouble(), graphics, zoom)
+                    }
+                }
+
+                if (node.name != null) {
+                    val unitsY = areas[column][area].first + 0.5
+                    val y = (unitsY * zoom).roundToInt()
+
+                    if (outputs[node] == null) {
+                        graphics.drawLine(x, y, x + variablesWidth, y)
+                    }
+
+                    drawVariable(node.name, x + variablesWidth - zoom / 3, y.toDouble() - zoom / 2, graphics, zoom)
+                }
             }
         }
 
